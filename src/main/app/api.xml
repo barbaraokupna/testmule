@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:https="http://www.mulesoft.org/schema/mule/https" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:wmq="http://www.mulesoft.org/schema/mule/ee/wmq" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.mulesoft.org/schema/mule/https http://www.mulesoft.org/schema/mule/https/current/mule-https.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/ee/wmq http://www.mulesoft.org/schema/mule/ee/wmq/current/mule-wmq-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <apikit:config name="api-config" raml="api.raml" consoleEnabled="true" consolePath="console" doc:name="Router" disableValidations="true"/>
+    <http:listener-config name="HTTPS_Listener_Configuration" protocol="HTTPS" host="0.0.0.0" port="8082" doc:name="HTTP Listener Configuration">
+        <tls:context>
+            <tls:key-store type="jks" path="keystore.jks" keyPassword="chicago" password="chicago" />
+        </tls:context>
+    </http:listener-config>
+    <flow name="api-main-https">
+        <http:listener config-ref="HTTPS_Listener_Configuration" path="/api/*" doc:name="HTTPS" />
+        <apikit:router config-ref="api-config" doc:name="APIkit Router" />
+        <exception-strategy ref="api-apiKitGlobalExceptionMapping" doc:name="Reference Exception Strategy" />
+    </flow>
+    <flow name="get:/orders/order:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysql_getOrderByOrderGUID" doc:name="worker_gateway_mysql_getOrderByOrderGUID" />
+    </flow>
+    <flow name="get:/buildings/building:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysql_call_TCAHoursByLocationType" doc:name="worker_gateway_mysql_call_TCAHoursByLocationType" />
+    </flow>
+    <flow name="get:/appointments/appointment:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysql_call_getAppointment" doc:name="worker_gateway_mysql_call_getAppointment" />
+    </flow>
+    <flow name="get:/orders:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysql_call_get_Orders" doc:name="worker_gateway_mysql_call_get_Orders" />
+    </flow>
+    <flow name="post:/appointments/appointment:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_post_appointment" doc:name="worker_gateway_mysqlSub_post_appointment" />
+    </flow>
+    <flow name="get:/initialize/bpmRoute:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_Flow_initialze_bpmURI" doc:name="worker_gateway_mysqlSub_Flow_initialze_bpmURI" />
+    </flow>
+    <flow name="get:/initialize/doors:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_Flow_initialzeDockApp" doc:name="worker_gateway_mysqlSub_Flow_initialzeDockApp" />
+    </flow>
+    <flow name="get:/carriers/carrier:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_get_carrier" doc:name="worker_gateway_mysqlSub_get_carrier" />
+    </flow>
+    <flow name="get:/appointments:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_get_appointments" doc:name="worker_gateway_mysqlSub_get_appointments" />
+    </flow>
+    <flow name="get:/initialize/getSyncData:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_get_syncData" doc:name="worker_gateway_mysqlSub_get_syncData" />
+    </flow>
+    <flow name="get:/initialize/configs:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_get_configs" doc:name="worker_gateway_mysqlSub_get_configs" />
+    </flow>
+    <flow name="get:/initialize/sites:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_get_sites" doc:name="worker_gateway_mysqlSub_get_sites" />
+    </flow>
+    <flow name="post:/carriers/carrier:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_post_carrier" doc:name="worker_gateway_mysqlSub_post_carrier" />
+    </flow>
+    <flow name="get:/orders/order/search:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_get_order_search" doc:name="worker_gateway_mysqlSub_get_order_search" />
+    </flow>
+    <flow name="get:/users/user/authenticate:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_get_userAuth" doc:name="worker_gateway_mysqlSub_get_userAuth" />
+    </flow>
+    <flow name="post:/users/user:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_post_user" doc:name="worker_gateway_mysqlSub_post_user" />
+    </flow>
+    <flow name="get:/users/user/authenticate/token:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_get_token" doc:name="worker_gateway_mysqlSub_get_token" />
+    </flow>
+    <flow name="post:/users/user/authenticate/token:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_post_token" doc:name="worker_gateway_mysqlSub_post_token" />
+    </flow>
+    <flow name="get:/carriers:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main"/>
+        <flow-ref name="worker_gateway_mysql_get_carriers" doc:name="worker_gateway_mysql_get_carriers"/>
+    </flow>
+    <flow name="get:/drivers:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main"/>
+        <flow-ref name="worker_gateway_mysql_get_drivers" doc:name="worker_gateway_mysql_get_drivers"/>
+    </flow>
+     <flow name="post:/drivers/driver:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main" />
+        <flow-ref name="worker_gateway_mysqlSub_post_driver" doc:name="worker_gateway_mysqlSub_post_driver" />
+    </flow>
+     <flow name="post:/notification/{objType}:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main"/>
+        <flow-ref name="notificationFlow" doc:name="notificationFlow" />
+    </flow>
+    <flow name="get:/rules:api-config">
+        <flow-ref name="worker_gateway_mysql_main" doc:name="worker_gateway_mysql_main"/>
+        <flow-ref name="worker_gateway_mysql_get_rules" doc:name="get_rules"/>
+      
+    </flow>
+
+    <apikit:mapping-exception-strategy name="api-apiKitGlobalExceptionMapping">
+        <apikit:mapping statusCode="404">
+            <apikit:exception value="org.mule.module.apikit.exception.NotFoundException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;message&quot;: &quot;Resource not found&quot; }" doc:name="Set Payload" />
+        </apikit:mapping>
+        <apikit:mapping statusCode="405">
+            <apikit:exception value="org.mule.module.apikit.exception.MethodNotAllowedException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;message&quot;: &quot;Method not allowed&quot; }" doc:name="Set Payload" />
+        </apikit:mapping>
+        <apikit:mapping statusCode="415">
+            <apikit:exception value="org.mule.module.apikit.exception.UnsupportedMediaTypeException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;message&quot;: &quot;Unsupported media type&quot; }" doc:name="Set Payload" />
+        </apikit:mapping>
+        <apikit:mapping statusCode="406">
+            <apikit:exception value="org.mule.module.apikit.exception.NotAcceptableException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;message&quot;: &quot;Not acceptable&quot; }" doc:name="Set Payload" />
+        </apikit:mapping>
+        <apikit:mapping statusCode="400">
+            <apikit:exception value="org.mule.module.apikit.exception.BadRequestException" />
+            <logger message="ERROR PAYLOAD - #[payload]" level="ERROR" doc:name="Logger" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;message&quot;: &quot;Bad request&quot; }" doc:name="Set Payload" />
+        </apikit:mapping>
+    </apikit:mapping-exception-strategy>
+</mule>

@@ -1,0 +1,613 @@
+#%RAML 0.8
+title: Dock Scheduler (QA)
+version: 1.1
+
+/users:
+  /user:
+    post:
+      queryParameters:
+        username:
+          displayName: username
+          type: string
+          description: username
+          example: erempel
+          required: true
+        firstName:
+          displayName: firstName
+          type: string
+          description: user's first name
+          example: Eric
+          required: false
+        lastName:
+          displayName: lastName
+          type: string
+          description: user's last name
+          example: Rumpelstiltskin
+          required: false
+        ciphertext:
+          displayName: ciphertext
+          type: string
+          required: true
+        salt:
+          displayName: salt
+          type: string
+          required: true
+        iv:
+          displayName: iv
+          type: string
+          required: true
+        HMAC:
+          displayName: HMAC
+          type: string
+          required: true
+        email:
+          displayName: email
+          type: string
+          required: true
+        active:
+          displayName: active
+          type: integer
+          required: false
+          default: 1
+      responses:
+          200:
+            body:
+              application/json:
+    /authenticate:
+      get:
+        queryParameters:
+          username:
+            displayName: username
+            type: string
+            description: username
+            example: erempel
+            required: true
+        responses:
+          200:
+            body:
+              application/json:
+      /token:
+        get:
+          queryParameters:
+            username:
+              displayName: username
+              type: string
+              description: username
+              example: erempel
+              required: true
+          responses:
+            200:
+              body:
+                application/json:
+        post:
+          queryParameters:
+            username:
+              displayName: username
+              type: string
+              description: username
+              example: erempel
+              required: true
+            tokenID:
+              displayName: tokenID
+              type: string
+              description: a unique session token
+              example: e817c7ef7713485092efafc1e5eb6a1e
+              required: true
+            expires:
+              displayName: expires
+              type: string
+              description: token expiration datetime
+              example: 2016-02-22 05:15:00
+              required: true
+          responses:
+                200:
+                  body:
+                    application/json:
+
+
+/carriers:
+  get:
+    responses:
+        200:
+          body:
+            application/json:
+  /carrier:
+    get:
+      queryParameters:
+        carrierName:
+          displayName: carrierName
+          type: string
+          description: CONTAINS fuzzy search on carrier name
+          example: Bob's Truck
+          required: false
+        SCAC:
+          displayName: SCAC
+          type: string
+          description: STARTS WITH fuzzy search on carrier scac
+          example: PYLE
+          required: false
+        dotNumber:
+          displayName: dotNumber
+          type: string
+          description: STARTS WITH fuzzy search on carrier dotNumber
+          example: 012345
+          required: false
+      responses:
+          200:
+            body:
+              application/json:
+    post:
+      queryParameters:
+        carrierName:
+          displayName: carrierName
+          type: string
+          description: Carrier Name
+          example: Bob's Truck Lines
+          required: true
+        SCAC:
+          displayName: SCAC
+          type: string
+          description: Standard Carrier Alpha Code
+          example: PYLE
+          required: false
+        modes:
+          displayName: modes
+          type: string
+          description: Motor Carrier Number
+          example: 012345
+          required: false
+        services:
+          displayName: services
+          type: string
+          description: List of services offered
+          example: 012345
+          required: false
+        dotNumber:
+          displayName: dotNumber
+          type: string
+          description: Department of Transportation Number
+          example: 203888A
+          required: false
+        cargoInsAmount:
+          displayName: cargoInsAmount
+          type: number
+          description: Cargo Insurance Amount
+          example: 50000.00
+          required: false
+        cargoInsExpires:
+          displayName: cargoInsExpires
+          type: date
+          description: Cargo Insurance Expiration Date
+          example: 2016-10-01
+          required: false
+        liabilityInsAmount:
+          displayName: liabilityInsAmount
+          type: number
+          description: Liability Insurance Amount
+          example: 50000.00
+          required: false
+        liabilityInsExpires:
+          displayName: liabilityInsExpires
+          type: date
+          description: Liability Insurance Expiration Date
+          example: 2016-10-01
+          required: false
+        federalEIN:
+          displayName: federalEIN
+          type: string
+          description: Federal Tax ID
+          example: 48-0000000
+          required: false
+      responses:
+          200:
+            body:
+              application/json:
+/orders:
+  get:
+    queryParameters:
+      orderStatus:
+        displayName: orderStatus
+        type: string
+        description: order status (null returns `Open Order')
+        example: Open Order
+        required: false
+      originCity:
+        displayName: originCity
+        type: string
+        description: origin warehouse city
+        example: Yuma
+        required: false
+      getDeleted:
+        displayName: getDeleted
+        type: integer
+        description: includes deleted orders in query result when true
+        example: 0
+        required: false
+        default: 0
+      lastUpdate:
+        displayName: lastUpdate
+        type: string
+        description: date since last update
+        example: '2016-10-10 08:30'
+        required: false
+    responses:
+        200:
+          body:
+            application/json:
+  /order:
+    get:
+      queryParameters:
+        orderGUID:
+          displayName: orderGUID
+          type: string
+          description: order GUID of a specific order
+          example: Some-GUID-123456-Random
+          required: true
+      responses:
+        200:
+          body:
+            application/json:
+    /search:
+      get:
+        queryParameters:
+          searchValue:
+            displayName: searchValue
+            type: string
+            description: fuzzy search value across orders (returns max 10)
+            example: 12345
+            required: true
+        responses:
+          200:
+            body:
+             application/json:
+
+    /items:
+      get:
+        queryParameters:
+          orderGUID:
+            displayName: items by orderGUID
+            type: string
+            description: get items for an order by orderGUID
+            example: Some-GUID-123456-Random
+            required: true
+        responses:
+          200:
+            body:
+              application/json:
+      /itemDetails:
+        get:
+          queryParameters:
+            orderGUID:
+              displayName: orderGUID
+              type: string
+              description: get all item details for an order by orderGUID
+              example: Some-GUID-123456-Random
+              required: true
+          responses:
+            200:
+              body:
+                application/json:
+
+/appointments:
+  get:
+    queryParameters:
+      queryDate:
+        displayName: queryDate
+        type: string
+        description: retrieve appointments around this calendar date. null will default to today.
+        example: 2016-01-10
+        required: false
+      lookAheadDays:
+        displayName: lookAheadDays
+        type: integer
+        description: days to search after queryDate
+        example: 30
+        required: false
+        default: 30
+      lookBehindDays:
+        displayName: lookBehindDays
+        type: integer
+        description: days to search before queryDate
+        example: 10
+        required: false
+        default: 10
+      getDeleted:
+        displayName: getDeleted
+        type: integer
+        description: includes deleted appointments in query result when true
+        example: 0
+        required: false
+        default: 0
+    responses:
+        200:
+          body:
+            application/json:
+
+  /appointment:
+    post:
+      queryParameters:
+        appointmentGUID:
+          displayName: appointmentGUID
+          type: string
+          description: unique appointment ID
+          example: some-appt-guid-0234
+          required: true
+        startUTC:
+          displayName: startUTC
+          type: string
+          description: appt start time (UTC)
+          example: 2016-02-22 05:15:00
+          required: true
+        durationMin:
+          displayName: durationMin
+          type: integer
+          description: length of appointment in minutes
+          example: 60
+          required: true
+        status:
+          displayName: status
+          type: string
+          description: status of appointment
+          example: scheduled
+          required: false
+        createdByUserID:
+          displayName: createdByUserID
+          type: integer
+          description: userID
+          example: 42
+          required: false
+        doorID:
+          displayName: doorID
+          type: integer
+          description: unique door identifier
+          example: 15
+          required: true
+        orderGUIDs:
+          displayName: orderGUIDs
+          type: string
+          description: comma separated list or json array of order guids on the appointment
+          example: some-guid-123,some-guid-124
+          required: false
+        gridCoordinates:
+          displayName: gridCoordinates
+          type: string
+          description: calendar coordinate location
+          example: 423,43,4
+          required: false
+        carrierID:
+          displayName: carrierID
+          type: integer
+          description: Integer ID for carrier
+          example: 15
+          required: false
+        appointmentSeriesGUID:
+          displayName: appointmentSeriesGUID
+          type: string
+          description: Recurring appointment GUID
+          example: some-guid-123
+          required: false
+        url:
+          displayName: url
+          type: string
+          description: UI route URL
+          example: /some/route
+          required: false
+        active:
+          displayName: active
+          type: integer
+          description: 1 = true / 0 = false
+          example: 1
+          required: false
+        userID:
+          displayName: userID
+          type: integer
+          description: Integer ID for user
+          example: 15
+          required: false
+        locked:
+          displayName: locked
+          type: integer
+          description: 1 = true / 0 = false
+          example: 1
+          required: false
+        notes:
+          displayName: notes
+          type: string
+          description: Appointment note blob limited to 500 characters
+          example: String of text
+          required: false
+        driverID:
+          displayName: driverID
+          type: integer
+          description: Integer ID for driver
+          example: 15
+          required: false
+        contactPhone:
+          displayName: contactPhone
+          type: string
+          description: Driver phone number
+          example: String of text
+          required: false
+        trailerNumber:
+          displayName: trailerNumber
+          type: string
+          description: Trailer ID number
+          example: String of text
+          required: false
+        bpmToken:
+          displayName: bpmToken
+          type: string
+          description: db generated md5 token for bpm routing
+          example: 9c8f789d4902ac9b3b8c50334df5cc
+          required: false
+      body:
+            application/json:
+      responses:
+        200:
+          body:
+            application/json:
+
+    get:
+      queryParameters:
+        appointmentGUID:
+            displayName: appointmentGUID
+            type: string
+            description: appointment GUID
+            required: true
+      responses:
+        200:
+          body:
+            application/json:
+
+
+/buildings:
+  /building:
+    get:
+      queryParameters:
+        buildingID:
+          displayName: buildingID
+          description: building identification
+          required: false
+        date:
+          displayName: date
+          type: date
+          description: date of a specific schedule
+          required: false
+        doorID:
+          displayName: doorID
+          description: specific door on a building
+          required: false
+        areaID:
+          displayName: areaID
+          description: area of a building identification
+          required: false
+        siteID:
+          displayName: siteID
+          description: identification of a site
+          required: false
+      responses:
+        200:
+          body:
+            application/json:
+/initialize:
+  /sites:
+    get:
+      responses:
+        200:
+          body:
+            application/json:
+  /configs:
+    get:
+      responses:
+        200:
+          body:
+            application/json:
+  /doors:
+    get:
+      queryParameters:
+        siteID:
+          displayName: siteID
+          type: integer
+          description: site ID (may contain multiple buildings)
+          example: 1
+          required: false
+          default: null
+        buildingID:
+          displayName: buildingID
+          type: integer
+          description: building ID (may contain multiple areas)
+          example: 1
+          required: false
+          default: null
+        areaID:
+          displayName: areaID
+          type: integer
+          description: area ID (may contain multiple doors)
+          example: 13
+          required: false
+          default: null
+        doorID:
+          displayName: doorID
+          type: integer
+          description: door ID (returns door info and hours)
+          example: 13
+          required: false
+          default: null
+      responses:
+        200:
+          body:
+            application/json:
+
+  /bpmRoute:
+    get:
+      queryParameters:
+        bpmToken:
+          displayName: bpmToken
+          type: string
+          description: db generated md5 token for bpm routing
+          example: 9c8f789d4902ac9b3b8c50334df5cc
+          required: true
+      responses:
+        200:
+          body:
+            application/json:
+  /getSyncData:
+    get:
+      responses:
+        200:
+          body:
+            application/json:
+/drivers:
+  get:
+    responses:
+        200:
+          body:
+            application/json:
+  /driver:
+    post:
+     queryParameters:
+      firstName:
+        displayName: firstName
+        type: string
+        description: First Name
+        example: Bob's Truck Lines
+        required: true
+      lastName:
+        displayName: lastName
+        type: string
+        description: Last Name
+        example: PYLE
+        required: true
+      carrierID:
+        displayName: carrierID
+        type: string
+        description: Carrier ID
+        example: 012345
+        required: true
+     responses:
+        200:
+          body:
+            application/json:
+
+/notification:               
+ /{objType}:
+        uriParameters:
+          objType:
+            description: Object Type (Appointment/Order)
+            type: string 
+        post:
+          description: "Notification"
+          body:
+            application/json:
+          responses:
+            200:
+              description: job finished OK
+              body:
+                application/json:
+                 
+/rules:
+  get:
+    responses:
+        200:
+          body:
+            application/json:

@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <http:request-config name="HTTP_Request_Configuration_BPM" host="${bpm.host}" port="${bpm.port}" basePath="${bpm.basePath}" doc:name="HTTP Request Configuration">
+        <http:raml-api-configuration location="http://router-qa.cloudhub.io/api"/>
+    </http:request-config>
+    <flow name="notificationFlow">
+
+        <set-variable variableName="objType" value="#[org.mule.util.StringUtils.lowerCase(flowVars.objType)]" doc:name="set objType"/>
+        <object-to-string-transformer doc:name="set payload to JSON from stream"/>
+        <json:json-to-object-transformer returnClass="java.lang.Object" doc:name="JSON to Object"/>
+        <set-variable variableName="origPayload" value="#[payload]" doc:name="orig payload"/>
+        <flow-ref name="notificationSub_Flow-parse_EventType" doc:name="notificationSub_Flow-parse_EventType"/>
+
+        <choice doc:name="Choice">
+            <when expression="#[objType=='order']">
+                <flow-ref name="notificationSub_Flow-order" doc:name="notificationSub_Flow-order"/>
+            </when>
+            <when expression="#[objType=='appointment']">
+                <flow-ref name="notificationSub_Flow-appointment" doc:name="notificationSub_Flow-appointment"/>
+            </when>
+            <otherwise>
+                <set-payload value="{ &quot;message&quot;: &quot;Object type not supported.&quot; }" doc:name="Set Payload"/>
+                <logger message="Object type not supported." level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </flow>
+    <sub-flow name="notificationSub_Flow-appointment">
+        <set-variable variableName="extractDataTypeIDLoc" value="#[2]" doc:name="extractDataTypeIDLoc"/>
+        <set-variable variableName="primaryKey" value="#[flowVars.origPayload.newObj.appointmentGUID]" doc:name="primaryKey"/>
+        <scatter-gather doc:name="Scatter-Gather">
+            <processor-chain>
+                <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Site Subscribers">
+                    <db:parameterized-query><![CDATA[CALL GetActiveSubscribers(:eventTypes, :extractDataTypeID, :extractZoneTypeID, :zone)]]></db:parameterized-query>
+                    <db:in-param name="eventTypes" type="INTEGER" value="#[flowVars.?eventTypeLoc]"/>
+                    <db:in-param name="extractDataTypeID" type="INTEGER" value="#[flowVars.?extractDataTypeIDLoc]"/>
+                    <db:in-param name="extractZoneTypeID" type="INTEGER" value="#[1]"/>
+                    <db:in-param name="zone" type="INTEGER" value="#[payload.?newObj.?siteID]"/>
+
+
+
+                </db:stored-procedure>
+                <set-payload value="#[payload['resultSet1']]" doc:name="Set Payload"/>
+            </processor-chain>
+			<processor-chain>
+	            <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Area Subscribers">
+                    <db:parameterized-query><![CDATA[CALL GetActiveSubscribers(:eventTypes, :extractDataTypeID, :extractZoneTypeID, :zone)]]></db:parameterized-query>
+                    <db:in-param name="eventTypes" type="INTEGER" value="#[flowVars.?eventTypeLoc]"/>
+                    <db:in-param name="extractDataTypeID" type="INTEGER" value="#[flowVars.?extractDataTypeIDLoc]"/>
+                    <db:in-param name="extractZoneTypeID" type="INTEGER" value="#[2]"/>
+                    <db:in-param name="zone" type="INTEGER" value="#[payload.?newObj.?areaID]"/>
+
+
+
+	            </db:stored-procedure>
+                <set-payload value="#[payload['resultSet1']]" doc:name="Set Payload"/>
+
+            </processor-chain>
+			<processor-chain>
+	            <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Building Subscribers">
+                    <db:parameterized-query><![CDATA[CALL GetActiveSubscribers(:eventTypes, :extractDataTypeID, :extractZoneTypeID, :zone)]]></db:parameterized-query>
+                    <db:in-param name="eventTypes" type="INTEGER" value="#[flowVars.?eventTypeLoc]"/>
+                    <db:in-param name="extractDataTypeID" type="INTEGER" value="#[flowVars.?extractDataTypeIDLoc]"/>
+                    <db:in-param name="extractZoneTypeID" type="INTEGER" value="#[3]"/>
+                    <db:in-param name="zone" type="INTEGER" value="#[payload.?newObj.?buildingID]"/>
+
+
+
+	
+	            </db:stored-procedure>
+                <set-payload value="#[payload['resultSet1']]" doc:name="Set Payload"/>
+
+            </processor-chain>
+			<processor-chain>
+	            <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Door Subscribers">
+                    <db:parameterized-query><![CDATA[CALL GetActiveSubscribers(:eventTypes, :extractDataTypeID, :extractZoneTypeID, :zone)]]></db:parameterized-query>
+                    <db:in-param name="eventTypes" type="INTEGER" value="#[flowVars.?eventTypeLoc]"/>
+                    <db:in-param name="extractDataTypeID" type="INTEGER" value="#[flowVars.?extractDataTypeIDLoc]"/>
+                    <db:in-param name="extractZoneTypeID" type="INTEGER" value="#[4]"/>
+                    <db:in-param name="zone" type="INTEGER" value="#[payload.?newObj.?doorID]"/>
+
+
+
+	
+	            </db:stored-procedure>
+                <set-payload value="#[payload['resultSet1']]" doc:name="Set Payload"/>
+
+            </processor-chain>
+            <processor-chain>
+                <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Any Appointment Subscribers">
+                    <db:parameterized-query><![CDATA[CALL GetActiveSubscribers(:eventTypes, :extractDataTypeID, :extractZoneTypeID, :zone)]]></db:parameterized-query>
+                    <db:in-param name="eventTypes" type="INTEGER" value="#[flowVars.?eventTypeLoc]"/>
+                    <db:in-param name="extractDataTypeID" type="INTEGER" value="#[flowVars.?extractDataTypeIDLoc]"/>
+                    <db:in-param name="extractZoneTypeID" type="INTEGER" value="#[null]"/>
+                    <db:in-param name="zone" type="INTEGER" value="#[null]"/>
+
+                </db:stored-procedure>
+                <set-payload value="#[payload['resultSet1']]" doc:name="Set Payload"/>
+            </processor-chain>
+
+			<processor-chain>
+                <expression-filter expression="#[payload.?newObj.?buildingID != payload.?oldObj.?buildingID]" doc:name="Expression"/>
+                <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Building Subscribers - old building">
+                    <db:parameterized-query><![CDATA[CALL GetActiveSubscribers(:eventTypes, :extractDataTypeID, :extractZoneTypeID, :zone)]]></db:parameterized-query>
+                    <db:in-param name="eventTypes" type="INTEGER" value="#[flowVars.?eventTypeLoc]"/>
+                    <db:in-param name="extractDataTypeID" type="INTEGER" value="#[flowVars.?extractDataTypeIDLoc]"/>
+                    <db:in-param name="extractZoneTypeID" type="INTEGER" value="#[3]"/>
+                    <db:in-param name="zone" type="INTEGER" value="#[payload.?oldObj.?buildingID]"/>
+
+                </db:stored-procedure>
+                <set-payload value="#[payload['resultSet1']]" doc:name="Set Payload"/>
+
+
+            </processor-chain>
+			<processor-chain>
+                <expression-filter expression="#[payload.?newObj.?siteID != payload.?oldObj.?siteID]" doc:name="Expression"/>
+                <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Copy_of_Site Subscribers - old site">
+                    <db:parameterized-query><![CDATA[CALL GetActiveSubscribers(:eventTypes, :extractDataTypeID, :extractZoneTypeID, :zone)]]></db:parameterized-query>
+                    <db:in-param name="eventTypes" type="INTEGER" value="#[flowVars.?eventTypeLoc]"/>
+                    <db:in-param name="extractDataTypeID" type="INTEGER" value="#[flowVars.?extractDataTypeIDLoc]"/>
+                    <db:in-param name="extractZoneTypeID" type="INTEGER" value="#[1]"/>
+                    <db:in-param name="zone" type="INTEGER" value="#[payload.?oldObj.?siteID]"/>
+
+                </db:stored-procedure>
+                <set-payload value="#[payload['resultSet1']]" doc:name="Copy_of_Set Payload"/>
+
+
+            </processor-chain>
+			<processor-chain>
+                <expression-filter expression="#[payload.?newObj.?doorID != payload.?oldObj.?doorID]" doc:name="Expression"/>
+                <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Door Subscribers - old door">
+                    <db:parameterized-query><![CDATA[CALL GetActiveSubscribers(:eventTypes, :extractDataTypeID, :extractZoneTypeID, :zone)]]></db:parameterized-query>
+                    <db:in-param name="eventTypes" type="INTEGER" value="#[flowVars.?eventTypeLoc]"/>
+                    <db:in-param name="extractDataTypeID" type="INTEGER" value="#[flowVars.?extractDataTypeIDLoc]"/>
+                    <db:in-param name="extractZoneTypeID" type="INTEGER" value="#[4]"/>
+                    <db:in-param name="zone" type="INTEGER" value="#[payload.?oldObj.?doorID]"/>
+
+                </db:stored-procedure>
+                <set-payload value="#[payload['resultSet1']]" doc:name="Set Payload"/>
+
+
+            </processor-chain>
+            <processor-chain>
+                <expression-filter expression="#[payload.?newObj.?areaID != payload.?oldObj.?areaID]" doc:name="Expression"/>
+                <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Area Subscribers -old area">
+                    <db:parameterized-query><![CDATA[CALL GetActiveSubscribers(:eventTypes, :extractDataTypeID, :extractZoneTypeID, :zone)]]></db:parameterized-query>
+                    <db:in-param name="eventTypes" type="INTEGER" value="#[flowVars.?eventTypeLoc]"/>
+                    <db:in-param name="extractDataTypeID" type="INTEGER" value="#[flowVars.?extractDataTypeIDLoc]"/>
+                    <db:in-param name="extractZoneTypeID" type="INTEGER" value="#[2]"/>
+                    <db:in-param name="zone" type="INTEGER" value="#[payload.?oldObj.?areaID]"/>
+
+                </db:stored-procedure>
+                <set-payload value="#[payload['resultSet1']]" doc:name="Set Payload"/>
+            </processor-chain>
+
+        </scatter-gather>
+        <combine-collections-transformer doc:name="Combine Collections"/>
+
+        <flow-ref name="notificationSub_Flow-process_subscribers" doc:name="notificationSub_Flow-process_subscribers"/>
+
+
+    </sub-flow>
+    <sub-flow name="notificationSub_Flow-order">
+        <set-variable variableName="primaryKey" value="#[flowVars.origPayload.newObj.orderGUID]" doc:name="primaryKey"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL GetActiveSubscribers(:eventTypes, :extractDataTypeID, :extractZoneTypeID, :zone)]]></db:parameterized-query>
+            <db:in-param name="eventTypes" type="INTEGER" value="#[flowVars.?eventTypeLoc]"/>
+            <db:in-param name="extractDataTypeID" type="INTEGER" value="#[1]"/>
+            <db:in-param name="extractZoneTypeID" type="INTEGER" value="#[1]"/>
+            <db:in-param name="zone" type="INTEGER" value="#[1]"/>
+
+        </db:stored-procedure>
+        <set-payload value="#[payload['resultSet1']]" doc:name="Set Payload"/>
+        <flow-ref name="notificationSub_Flow-process_subscribers" doc:name="notificationSub_Flow-process_subscribers"/>
+
+    </sub-flow>
+    <sub-flow name="notificationSub_Flow-parse_EventType">
+        <set-variable variableName="eventType" value="#[org.mule.util.StringUtils.lowerCase(payload.eventType)]" doc:name="Variable"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.eventType == 'create']">
+                <set-variable variableName="eventTypeLoc" value="#[1]" doc:name="create"/>
+            </when>
+            <when expression="#[flowVars.eventType == 'delete']">
+                <set-variable variableName="eventTypeLoc" value="#[2]" doc:name="delete"/>
+            </when>
+            <otherwise>
+                <set-variable variableName="eventTypeLoc" value="#[4]" doc:name="edit"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="notificationSub_Flow-process_subscribers">
+        <choice doc:name="Choice">
+            <when expression="#[payload.isEmpty() == false]">
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	UserID: flowVars.origPayload.userID,
+	Application: flowVars.origPayload.applicationName,
+	original: flowVars.origPayload.oldObj,
+	updated: flowVars.origPayload.newObj,
+	type: flowVars.objType,
+	event: flowVars.eventType,
+	subscribers: payload map ((subscriber) -> subscriber.name)
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer doc:name="Object to String"/>
+                <flow-ref name="notificationFlow-send_to_bpm" doc:name="notificationFlow-send_to_bpm"/>
+            </when>
+            <otherwise>
+                <set-payload value="{ &quot;message&quot;: &quot;No subscribers found.&quot; }" doc:name="Set Payload"/>
+                <logger message="No subscribers found!" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+
+    </sub-flow>
+    <flow name="notificationFlow-send_to_bpm">
+        <set-variable variableName="requestID" value="#[java.util.UUID.randomUUID().toString()]" doc:name="requestID"/>
+     
+          <http:request config-ref="HTTP_Request_Configuration_BPM" path="/customers/{customerName}/requests" method="POST" doc:name="HTTP">
+            <http:request-builder>
+                <http:query-param paramName="request-id" value="#[flowVars.requestID]"/>
+                <http:query-param paramName="service-id" value="${bpm.serviceID}"/>
+                <http:query-param paramName="primaryKey" value="#[flowVars.primaryKey]"/>
+                <http:uri-param paramName="customerName" value="${bpm.customer}"/>
+                <http:header headerName="Content-Type" value="application/json"/>
+
+
+            </http:request-builder>
+
+        </http:request>
+        <object-to-string-transformer doc:name="Copy_of_Read Response Stream"/>
+
+        <logger message="Message sent to BPM successfully!" level="INFO" doc:name="Logger"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <exception-strategy ref="notificationCatch_Exception_Strategy-BPM" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <catch-exception-strategy name="notificationCatch_Exception_Strategy-BPM">
+        <set-variable variableName="error" value="#[groovy:message.getExceptionPayload().getRootException().getMessage()]" doc:name="error"/>
+        <set-property propertyName="http.status" value="500" doc:name="http.status = 500"/>
+        <set-payload value="{ &quot;message&quot;: &quot;Error calling BPM API&quot; }" doc:name="Set Payload"/>
+        <logger message="Error calling BPM API. Error: #[flowVars.error]" level="INFO" doc:name="Logger"/>
+    </catch-exception-strategy>
+
+
+</mule>

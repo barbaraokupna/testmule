@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:s3="http://www.mulesoft.org/schema/mule/s3" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/s3 http://www.mulesoft.org/schema/mule/s3/current/mule-s3.xsd">
+
+	<sub-flow name="amazon_sss_savePayloadToS3">
+        <s3:create-object config-ref="Amazon_S3" bucketName="#[flowVars.outputBucket]" key="#[flowVars.keyName]" doc:name="Amazon S3"/>
+        <set-payload value="https://#[flowVars.outputBucket].s3.amazonaws.com/#[flowVars.keyName]" doc:name="URI" />
+        <logger message="amazon_sss_savePayloadToS3 OK - S3 URI: #[payload]" level="INFO" doc:name="Logger"/>
+
+	</sub-flow>
+</mule>

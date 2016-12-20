@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:s3="http://www.mulesoft.org/schema/mule/s3" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/s3 http://www.mulesoft.org/schema/mule/s3/current/mule-s3.xsd">
+    <db:mysql-config name="MySQL_Configuration" host="${sql.host}" port="${sql.port}" user="${sql.user}" password="${sql.pass}" database="${sql.database}" doc:name="MySQL Configuration" connectionTimeout="60">
+        <db:pooling-profile maxPoolSize="100" minPoolSize="5"/>
+    </db:mysql-config>
+    <db:mysql-config name="MySQL_Configuration_Replica" host="${sqlread.host}" port="${sql.port}" user="${sql.user}" password="${sql.pass}" database="${sql.database}" doc:name="MySQL Configuration" connectionTimeout="60">
+        <db:pooling-profile maxPoolSize="100" minPoolSize="5"/>
+    </db:mysql-config>
+    <s3:config name="Amazon_S3" accessKey="${s3.accessKey}" secretKey="${s3.secretKey}" doc:name="Amazon S3: Configuration"/>
+</mule>

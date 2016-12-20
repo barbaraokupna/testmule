@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+    <db:template-query name="StoredProcedure" doc:name="Template Query">
+        <db:parameterized-query><![CDATA[CALL TCAHoursByLocationType(:siteid, :buildingid, :areaid, :doorid, :dateid)]]></db:parameterized-query>
+    </db:template-query>
+    <http:request-config name="HTTP_Request_Configuration" doc:name="HTTP Request Configuration" port="80"/>
+    <vm:connector name="VM" validateConnections="true" doc:name="VM">
+        <vm:queue-profile>
+            <default-persistent-queue-store/>
+        </vm:queue-profile>
+    </vm:connector>
+    <http:request-config name="HTTPS_Request_Configuration" protocol="HTTPS" port="443" doc:name="HTTP Request Configuration"/>
+
+    <sub-flow name="worker_gateway_mysql_main">
+        <logger message="Remote IP: #[message.inboundProperties.'http.remote.address']" level="INFO" doc:name="Logger"/>
+        <logger message="Inbound: #[message.inboundProperties.'http.request.uri']" level="INFO" doc:name="Logger"/>
+        <logger message="Request Body: #[payload]" level="INFO" doc:name="Logger"/>
+        <flow-ref name="worker_gateway_mysql_building_vars" doc:name="worker_gateway_mysql_building_vars"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysql_building_vars">
+        <foreach collection="#[message.inboundProperties.'http.query.params']" doc:name="For Each">
+            <set-variable variableName="#[flowVars.key]" value="#[payload]" doc:name="Variable"/>
+        </foreach>
+    </sub-flow>
+    <flow name="worker_gateway_mysqlFlow">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="bpm" connector-ref="VM" doc:name="VM"/>
+        <logger message="BPM Json : #[payload]" level="INFO" doc:name="Logger"/>
+        <set-variable variableName="clientName" value="${clientName}" doc:name="clientName"/>
+        <set-variable variableName="appName" value="${appName}" doc:name="appName"/>
+        <set-variable variableName="environment" value="${environment}" doc:name="environment"/>
+        <set-variable variableName="payload" value="#[payload]" doc:name="payload"/>
+        <set-variable variableName="bpmToken" value="#[message.inboundProperties.bpmToken]" doc:name="bpmToken"/>
+        <set-variable variableName="appointmentGUID" value="#[message.inboundProperties.appointmentGUID]" doc:name="appointmentGUID"/>
+        <flow-ref name="worker_gateway_mysqlSub_Flow_initialze_bpmURI" doc:name="worker_gateway_mysqlSub_Flow_initialze_bpmURI"/>
+    </flow>
+    <sub-flow name="worker_gateway_mysqlSub_Flow_initialze_bpmURI">
+        <logger message="GET - CALL bpmTokenValidation(#[flowVars.?bpmToken])" level="INFO" doc:name="Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL bpmTokenValidation(:bpmToken)]]></db:parameterized-query>
+            <db:in-param name="bpmToken" type="VARCHAR" value="#[flowVars.?bpmToken]"/>
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysqlSub_Flow_initialze_bpmURI_vars" doc:name="worker_gateway_mysqlSub_Flow_initialze_bpmURI_vars"/>
+        <flow-ref name="amazon_sss_savePayloadToS3" doc:name="amazon_sss_savePayloadToS3"/>
+        <set-property propertyName="#['Content-Type']" value="#['text/plain']" doc:name="Property"/>
+        <choice doc:name="https?">
+            <when expression="flowVars.protocol">
+                <http:request config-ref="HTTPS_Request_Configuration" path="#[flowVars.path]" method="PUT" host="#[flowVars.host]" doc:name="HTTPS">
+                </http:request>
+            </when>
+            <otherwise>
+                <http:request config-ref="HTTP_Request_Configuration" path="#[flowVars.path]" method="PUT" host="#[flowVars.host]" doc:name="HTTP">
+                </http:request>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_Flow_initialze_bpmURI_vars">
+        <logger message="DB Answer: #[payload]" level="INFO" doc:name="Logger"/>
+        <set-variable variableName="uri" value="#[payload['resultSet1'][0]['bpmURI']]" doc:name="URI"/>
+        <scripting:component doc:name="URI Validator">
+            <scripting:script engine="Groovy"><![CDATA[try {
+		new org.apache.commons.validator.routines.UrlValidator().isValid(flowVars.uri)
+	} catch (all) {
+		throw new IllegalArgumentException("payload should be an valid URI: " + flowVars.uri);
+	};
+
+return payload; ]]></scripting:script>
+        </scripting:component>
+        <logger message="URI: #[flowVars.uri]" level="INFO" doc:name="Logger"/>
+        <set-variable variableName="host" value="#[new URI(flowVars.uri).getHost()]" doc:name="host"/>
+        <set-variable variableName="path" value="#[new URI(flowVars.uri).getPath()]" doc:name="path"/>
+        <set-variable variableName="protocol" value="#[flowVars.uri.contains('https')]" doc:name="protocol"/>
+        <set-payload value="#[flowVars.payload]" doc:name="Set Payload"/>
+        <json:json-to-xml-transformer doc:name="JSON to XML"/>
+        <set-variable variableName="fileName" value="#[flowVars.appointmentGUID + '-' + System.currentTimeMillis() + '.xml']" doc:name="fileName"/>
+        <set-variable variableName="outputBucket" value="#['redwoodscs' + (flowVars.environment == 'qa' ? '-qa' : '')]" doc:name="outputBucket"/>
+        <set-variable variableName="keyName" value="#['client-data/'+flowVars.clientName+'/'+flowVars.appName+'/'+server.dateTime.year+'/'+server.dateTime.month+'/'+server.dateTime.dayOfMonth+'/'+flowVars.fileName]" doc:name="keyName"/>
+        <gzip-compress-transformer></gzip-compress-transformer>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysql_call_TCAHoursByLocationType">
+        <logger message="Stored - CALL: TCAHoursByLocationType" level="INFO" doc:name="Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL TCAHoursByLocationType(:siteid, :buildingid, :areaid, :doorid, :dateid)]]></db:parameterized-query>
+            <db:in-param name="siteid" type="INTEGER" value="#[flowVars.?siteID]"/>
+            <db:in-param name="buildingid" type="INTEGER" value="#[flowVars.?buildingID]"/>
+            <db:in-param name="areaid" type="INTEGER" value="#[flowVars.?areaID]"/>
+            <db:in-param name="doorid" type="INTEGER" value="#[flowVars.?doorID]"/>
+            <db:in-param name="dateid" type="DATE" value="#[flowVars.?date]"/>
+
+        </db:stored-procedure>
+<flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysql_call_OrderPull">
+        <logger level="INFO" doc:name="Logger" message="Stored - CALL orderPull(#[flowVars.?date1+','+ flowVars.?date2+','+ flowVars.?items+','+ flowVars.?status+','+ flowVars.?orderValue+','+ flowVars.?orderGuid+','+ flowVars.?orderID])"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL orderPull(:date1, :date2, :items, :statusID, :orderValue, :orderGuid, :orderID)]]></db:parameterized-query>
+            <db:in-param name="date1" type="VARCHAR" value="#[flowVars.?date1]"/>
+            <db:in-param name="date2" type="VARCHAR" value="#[flowVars.?date2]"/>
+            <db:in-param name="items" type="SMALLINT" value="#[flowVars.?items]"/>
+            <db:in-param name="statusID" type="VARCHAR" value="#[flowVars.?status]"/>
+            <db:in-param name="orderValue" type="VARCHAR" value="#[flowVars.?orderValue]"/>
+            <db:in-param name="orderGuid" type="VARCHAR" value="#[flowVars.?orderGUID]"/>
+            <db:in-param name="orderID" type="INTEGER" value="#[flowVars.?orderID]"/>
+
+        </db:stored-procedure>
+<flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysql_call_getAppointment">
+        <logger level="INFO" doc:name="Logger" message="Stored - CALL getAppointment(#[flowVars.?appointmentGUID])"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL getAppointment(:appointmentGUID)]]></db:parameterized-query>
+            <db:in-param name="appointmentGUID" type="VARCHAR" value="#[flowVars.?appointmentGUID]"/>
+
+        </db:stored-procedure>
+<flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysql_call_get_Orders">
+        <logger level="INFO" doc:name="Logger" message="Stored - CALL getOrders(#[flowVars.?orderStatus+','+ flowVars.?originCity+','+ flowVars.?getDeleted])"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Database" >
+            <db:parameterized-query><![CDATA[CALL getOrders(:orderStatus, :originCity, :getDeleted, :lastUpdate, null)]]></db:parameterized-query>
+            <db:in-param name="lastUpdate" type="VARCHAR" value="#[flowVars.?lastUpdate]"/>
+            <db:in-param name="getDeleted" type="INTEGER" value="#[flowVars.?getDeleted]"/>
+            <db:in-param name="orderStatus" type="VARCHAR" value="#[flowVars.?orderStatus]"/>
+            <db:in-param name="originCity" type="VARCHAR" value="#[flowVars.?originCity]"/>
+
+
+
+        </db:stored-procedure>
+<flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_get_order_search"><logger level="INFO" doc:name="Logger" message="Stored - CALL getOrderSearch(#[flowVars.?searchValue])"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Database" >
+            <db:parameterized-query><![CDATA[CALL getOrderSearch(:searchValue)]]></db:parameterized-query>
+            <db:in-param name="searchValue" type="VARCHAR" value="#[flowVars.?searchValue]"/>
+
+        </db:stored-procedure>
+<flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysql_getOrderByOrderGUID">
+		<logger level="INFO" doc:name="Logger" message="Stored - CALL getOrderByOrderGUID(#[flowVars.?orderGUID+','+ flowVars.?getItems+','+ flowVars.?getItemDetails])"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL getOrders(null, null, null, null, :orderGUID)]]></db:parameterized-query>
+            <db:in-param name="orderGUID" type="VARCHAR" value="#[flowVars.?orderGUID]"/>
+
+
+        </db:stored-procedure>
+<flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_Flow_initialzeDockApp">
+    <logger level="INFO" doc:name="Logger" message="Stored - CALL initializeDockApp(#[flowVars.?siteID])"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL initializeDockApp(:siteID)]]></db:parameterized-query>
+            <db:in-param name="siteID" type="VARCHAR" value="#[flowVars.?siteID or null]"/>
+
+
+        </db:stored-procedure>
+<flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_post_appointment">
+        <logger message="Stored - CALL postAppointment(#[flowVars.?appointmentGUID+','+ flowVars.?startTimeUTC+','+ flowVars.?durationMin+','+ flowVars.?status+','+ flowVars.?createdByUserID+','+ flowVars.?doorID+','+ flowVars.?orderGUIDs+','+ flowVars.?gridCoordinates +','+ flowVars.?contactPhone])" level="INFO" doc:name="Logger"/>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <set-variable variableName="payload" value="#[payload]" doc:name="payload"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL postAppointment(:appointmentGUID, :startUTC, :durationMin, :apptStatus, :createdByUserID, :doorID, :orderGUIDs, :gridCoordinates, :carrierID, :appointmentSeriesGUID, :url, :active, :userID, :locked, :notes, :driverID,:contactPhone,:trailerNumber)]]></db:parameterized-query>
+            <db:in-param name="contactPhone" type="VARCHAR" value="#[flowVars.?contactPhone]"/>
+            <db:in-param name="trailerNumber" type="VARCHAR" value="#[flowVars.?trailerNumber]"/>
+            <db:in-param name="carrierID" type="INTEGER" value="#[(flowVars.carrierID == &quot;null&quot; || flowVars.carrierID == &quot;&quot;) ? null : flowVars.carrierID]"/>
+            <db:in-param name="appointmentSeriesGUID" type="VARCHAR" value="#[flowVars.?appointmentSeriesGUID]"/>
+            <db:in-param name="url" type="VARCHAR" value="#[flowVars.?url]"/>
+            <db:in-param name="active" type="TINYINT" value="#[flowVars.?active]"/>
+            <db:in-param name="userID" type="INTEGER" value="#[flowVars.?userID]"/>
+            <db:in-param name="locked" type="TINYINT" value="#[flowVars.?locked]"/>
+            <db:in-param name="notes" type="VARCHAR" value="#[flowVars.?notes]"/>
+            <db:in-param name="driverID" type="INTEGER" value="#[(flowVars.driverID == &quot;null&quot; || flowVars.driverID == &quot;&quot;) ? null : flowVars.driverID]"/>
+            <db:in-param name="appointmentGUID" type="VARCHAR" value="#[flowVars.?appointmentGUID]"/>
+            <db:in-param name="startUTC" type="VARCHAR" value="#[flowVars.?startUTC]"/>
+            <db:in-param name="durationMin" type="INTEGER" value="#[flowVars.?durationMin]"/>
+            <db:in-param name="apptStatus" type="VARCHAR" value="#[flowVars.?status]"/>
+            <db:in-param name="createdByUserID" type="INTEGER" value="#[flowVars.?createdByUserID]"/>
+            <db:in-param name="doorID" type="INTEGER" value="#[flowVars.?doorID]"/>
+            <db:in-param name="orderGUIDs" type="VARCHAR" value="#[flowVars.?orderGUIDs]"/>
+            <db:in-param name="gridCoordinates" type="VARCHAR" value="#[flowVars.?gridCoordinates]"/>
+
+
+
+
+
+        </db:stored-procedure>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.payload != '{NullPayload}' &amp;&amp; flowVars.bpmToken != null]">
+                <set-variable variableName="answer" value="#[payload[ 'resultSet' + (payload.size() - 1) ] ]" doc:name="answer"/>
+                <set-payload value="#[flowVars.payload]" doc:name="Saved Json"/>
+                <set-property propertyName="appointmentGUID" value="#[flowVars.appointmentGUID]" doc:name="appointmentGUID"/>
+                <set-property propertyName="bpmToken" value="#[flowVars.bpmToken]" doc:name="bpmToken"/>
+                <vm:outbound-endpoint exchange-pattern="one-way" path="bpm" connector-ref="VM" doc:name="VM"/>
+                <set-payload value="#[flowVars.answer]" doc:name="Set Payload"/>
+            </when>
+            <otherwise>
+                <set-payload value="#[payload[ 'resultSet' + (payload.size() - 1) ] ]" doc:name="Set Payload"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_get_carrier">
+    <logger message="Stored - CALL getCarrier(#[flowVars.?carrierName+','+ flowVars.?scac+','+ flowVars.?mcNumber])" level="INFO" doc:name="Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL getCarrier(:carrierName, :scac, :mcNumber)]]></db:parameterized-query>
+            <db:in-param name="carrierName" type="VARCHAR" value="#[flowVars.?carrierName]"/>
+            <db:in-param name="scac" type="VARCHAR" value="#[flowVars.?scac]"/>
+            <db:in-param name="mcNumber" type="VARCHAR" value="#[flowVars.?mcNumber]"/>
+
+        </db:stored-procedure>
+<flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+        </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_post_carrier">
+        <logger message="Stored - CALL getCarrier(#[flowVars.?carrierName+','+ flowVars.?scac+','+ flowVars.?mcNumber])" level="INFO" doc:name="Copy_of_Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL postCarrier(:carrierName, :SCAC, :modes, :services , :dotNumber , :cargoInsAmount , :cargoInsExpires, :liabilityInsAmount , :liabilityInsExpires , :federalEIN)]]></db:parameterized-query>
+            <db:in-param name="services" type="VARCHAR" value="#[flowVars.?services]"/>
+            <db:in-param name="dotNumber" type="VARCHAR" value="#[flowVars.?dotNumber]"/>
+            <db:in-param name="cargoInsAmount" type="DECIMAL" value="#[flowVars.?cargoInsAmount]"/>
+            <db:in-param name="cargoInsExpires" type="VARCHAR" value="#[flowVars.?cargoInsExpires]"/>
+            <db:in-param name="liabilityInsAmount" type="DECIMAL" value="#[flowVars.?liabilityInsAmount]"/>
+            <db:in-param name="liabilityInsExpires" type="VARCHAR" value="#[flowVars.?liabilityInsExpires]"/>
+            <db:in-param name="federalEIN" type="VARCHAR" value="#[flowVars.?federalEIN]"/>
+            <db:in-param name="modes" type="VARCHAR" value="#[flowVars.?modes]"/>
+            <db:in-param name="carrierName" type="VARCHAR" value="#[flowVars.?carrierName]"/>
+            <db:in-param name="SCAC" type="VARCHAR" value="#[flowVars.?SCAC]"/>
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_get_appointments">
+    <logger message="Stored - CALL getCarrier(#[flowVars.?queryDate+','+ flowVars.?lookAheadDays+','+ flowVars.?lookBehindDays])" level="INFO" doc:name="Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL getAppointments(:queryDate, :lookAheadDays, :lookBehindDays, :getDeleted)]]></db:parameterized-query>
+            <db:in-param name="getDeleted" type="INTEGER" value="#[flowVars.?getDeleted]"/>
+            <db:in-param name="queryDate" type="VARCHAR" value="#[flowVars.?queryDate]"/>
+            <db:in-param name="lookAheadDays" type="INTEGER" value="#[flowVars.?lookAheadDays]"/>
+            <db:in-param name="lookBehindDays" type="INTEGER" value="#[flowVars.?lookBehindDays]"/>
+
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+        </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_get_syncData">
+        <logger message="Stored - CALL getSyncData()" level="INFO" doc:name="Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL getSyncData()]]></db:parameterized-query>
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_get_configs">
+        <logger message="Stored - CALL getConfigs()" level="INFO" doc:name="Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Copy_of_Database">
+            <db:parameterized-query><![CDATA[CALL getConfigs()]]></db:parameterized-query>
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_get_sites">
+        <logger message="Stored - CALL getSites()" level="INFO" doc:name="Copy_of_Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL getSites()]]></db:parameterized-query>
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_get_userAuth">
+        <logger message="Call Stored Procedure:  authenticateUser(#[flowVars.?username])" level="INFO" doc:name="Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL authenticateUser(:username)]]></db:parameterized-query>
+            <db:in-param name="username" value="#[flowVars.?username]"/>
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_post_user">
+        <logger message="Call Stored Procedure:  createUser(#[flowVars.?username+','+ flowVars.?firstName+','+ flowVars.?lastName+','+ flowVars.?ciphertext+','+ flowVars.?salt+','+ flowVars.?iv+','+ flowVars.?HMAC+','+ flowVars.?email+','+ flowVars.?active])" level="INFO" doc:name="Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL createUser(:username, :firstName, :lastName, :ciphertext, :salt, :iv, :HMAC, :email, :active)]]></db:parameterized-query>
+            <db:in-param name="username" type="VARCHAR" value="#[flowVars.?username]"/>
+            <db:in-param name="firstName" type="VARCHAR" value="#[flowVars.?firstName]"/>
+            <db:in-param name="lastName" type="VARCHAR" value="#[flowVars.?lastName]"/>
+            <db:in-param name="ciphertext" type="VARCHAR" value="#[flowVars.?ciphertext]"/>
+            <db:in-param name="salt" type="VARCHAR" value="#[flowVars.?salt]"/>
+            <db:in-param name="iv" type="VARCHAR" value="#[flowVars.?iv]"/>
+            <db:in-param name="HMAC" type="VARCHAR" value="#[flowVars.?HMAC]"/>
+            <db:in-param name="active" type="INTEGER" value="#[flowVars.?active]"/>
+            <db:in-param name="email" type="VARCHAR" value="#[flowVars.?email]"/>
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+            <sub-flow name="worker_gateway_mysql_build_answer">
+        <set-payload value="#[payload['resultSet1']]" doc:name="Set Payload"/>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+        <logger message="Answer - #[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="Copy_of_worker_gateway_mysqlSub_get_sites">
+        <logger message="Stored - CALL getSites()" level="INFO" doc:name="Copy_of_Copy_of_Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Copy_of_Database">
+            <db:parameterized-query><![CDATA[CALL getSites()]]></db:parameterized-query>
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="Copy_of_worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_get_token">
+        <logger message="Call Stored Procedure:  getAuthToken(#[flowVars.?username])" level="INFO" doc:name="Copy_of_Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL getAuthToken(:username)]]></db:parameterized-query>
+            <db:in-param name="username" type="VARCHAR" value="#[flowVars.?username]"/>
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_post_token">
+        <logger message="postAuthToken(#[flowVars.?username+','+ flowVars.?tokenID+','+ flowVars.?expires])" level="INFO" doc:name="Copy_of_Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL postAuthToken(:username, :tokenID, :expires)]]></db:parameterized-query>
+            <db:in-param name="username" type="VARCHAR" value="#[flowVars.?username]"/>
+            <db:in-param name="tokenID" type="VARCHAR" value="#[flowVars.?tokenID]"/>
+            <db:in-param name="expires" type="VARCHAR" value="#[flowVars.?expires]"/>
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+        <sub-flow name="worker_gateway_mysql_get_carriers">
+        <logger message="Call Stored Procedure:  CALL getCarriers();" level="INFO" doc:name="Copy_of_Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL getCarriers();]]></db:parameterized-query>
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+        <sub-flow name="worker_gateway_mysql_get_drivers">
+        <logger message="Call Stored Procedure:  CALL getDrivers();" level="INFO" doc:name="Copy_of_Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL getDrivers();]]></db:parameterized-query>
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysqlSub_post_driver">
+		<logger message="Call Stored Procedure:  postDriver(#[flowVars.?firstName+','+ flowVars.?lastName+','+ flowVars.?carrierID])" level="INFO" doc:name="Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL postDriver(:driverName, :firstName, :lastName, :carrierID)]]></db:parameterized-query>
+            <db:in-param name="driverName" type="VARCHAR" value="#[flowVars.?driverName]"/>
+            <db:in-param name="firstName" type="VARCHAR" value="#[flowVars.?firstName]"/>
+            <db:in-param name="lastName" type="VARCHAR" value="#[flowVars.?lastName]"/>
+            <db:in-param name="carrierID" type="INTEGER" value="#[flowVars.?carrierID]"/>
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+    <sub-flow name="worker_gateway_mysql_get_rules">
+        <logger message="Call Stored Procedure:  CALL getDrivers();" level="INFO" doc:name="Copy_of_Logger"/>
+        <db:stored-procedure config-ref="MySQL_Configuration_Replica" doc:name="Database">
+            <db:parameterized-query><![CDATA[CALL getRules();]]></db:parameterized-query>
+
+
+        </db:stored-procedure>
+        <flow-ref name="worker_gateway_mysql_build_answer" doc:name="worker_gateway_mysql_build_answer"/>
+    </sub-flow>
+</mule>
