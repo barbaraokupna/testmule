@@ -10,7 +10,7 @@ phases:
       - echo Build completed on `date`
       - mvn package
       - echo "******** Uploading to S3 ********"
-      - aws s3 sync target/ s3://codebuildbokupnaMULE
+      - aws s3 sync target/ s3://codebuildbokupna3
 artifacts:
   files:
     - target/testMaven-1.0-SNAPSHOT.jar
