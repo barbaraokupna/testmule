@@ -24,7 +24,21 @@
 				<version>${mule.tools.version}</version>
 				<extensions>true</extensions>
 				<configuration>
-                    <copyToAppsDirectory>true</copyToAppsDirectory>
+                   	<deploymentType>cloudhub</deploymentType>
+        			<muleVersion>3.7.0</muleVersion>               <!-- This is the runtime version as it appears on the CloudHub interface -->
+       				<username>barbaraokupna</username>
+        			<password>Athena2290*</password>
+        			<environment>Development</environment>
+        		</configuration>
+        		<executions>
+        			<execution>
+        				<id>deploy</id>
+        				<phase>deploy</phase>
+        				<goals>
+        					<goal>deploy</goal>
+        				</goals>
+        			</execution>
+        		</executions>
 				<inclusions>
                         <inclusion>
                             <groupId>org.mule.modules</groupId>
