@@ -28,8 +28,7 @@
        				<username>barbaraokupna</username>
         			<password>Athena2290*</password>
         			<environment>Development</environment>
-        			<Application>workergatewaymysqldev</Application>
-        			<url>https://anypoint.mulesoft.com</url>
+        			<applicationName>workergatewaymysqldev</applicationName>
 				<inclusions>
                         <inclusion>
                             <groupId>org.mule.modules</groupId>
