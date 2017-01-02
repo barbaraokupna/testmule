@@ -10,4 +10,7 @@ phases:
       - echo Build completed on `date`
       - mvn package
       - echo "******** Uploading to S3 ********"
-      - aws s3 sync target/worker_gateway_mysql-1.3.4.zip s3://codebuildbokupna3
+      - aws s3 sync target/ s3://codebuildbokupna3
+artifacts:
+  files:
+    - target/worker_gateway_mysql-1.3.4.zip
