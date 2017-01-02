@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.redwoodscs</groupId>
 	<artifactId>worker_gateway_mysql</artifactId>
-    <version>1.3.5</version>
+    <version>1.3.6</version>
     <packaging>mule</packaging>
 	<name>Mule worker_gateway_mysql Application</name>
 
@@ -46,6 +46,9 @@
         				<goals>
         					<goal>deploy</goal>
         				</goals>
+        				<configuration>
+        					<Application>workergatewaymysqldev</Application>
+        				</configuration>
         			</execution>
         		</executions>
 			</plugin>
