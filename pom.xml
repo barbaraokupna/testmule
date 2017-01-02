@@ -21,25 +21,15 @@
 			<plugin>
 				<groupId>org.mule.tools.maven</groupId>
 				<artifactId>mule-app-maven-plugin</artifactId>
-				<version>${mule.tools.version}</version>
-				<extensions>true</extensions>
+				<version>2.1.1</version>
 				<configuration>
                    	<deploymentType>cloudhub</deploymentType>
                    	<muleVersion>API Gateway 2.2.0</muleVersion> 
        				<username>barbaraokupna</username>
         			<password>Athena2290*</password>
         			<environment>Development</environment>
+        			<redeploy>true</redeploy>
         			<applicationName>workergatewaymysqldev</applicationName>
-				<inclusions>
-                        <inclusion>
-                            <groupId>org.mule.modules</groupId>
-                            <artifactId>mule-module-apikit</artifactId>
-                        </inclusion>
-                    <inclusion>
-                            <groupId>org.mule.modules</groupId>
-                            <artifactId>mule-module-s3</artifactId>
-                        </inclusion>
-                    </inclusions>
                 </configuration>
                 <executions>
         			<execution>
@@ -48,9 +38,6 @@
         				<goals>
         					<goal>deploy</goal>
         				</goals>
-        				<configuration>
-        					<Application>workergatewaymysqldev</Application>
-        				</configuration>
         			</execution>
         		</executions>
 			</plugin>
