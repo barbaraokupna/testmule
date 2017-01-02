@@ -226,6 +226,13 @@
             <name>MuleEE Releases Repository</name>
             <url>https://repository-master.mulesoft.org/nexus/content/repositories/releases-ee/</url>
         </repository>
+       <repository>
+         <id>codehaus-mule-repo</id>
+         <name>codehaus-mule-repo</name>
+         <url>https://repository.mulesoft.org/nexus/content/groups/public/</url>
+         <layout>default</layout>
+ </repository>
+
     </repositories>
     <pluginRepositories>
         <pluginRepository>
