@@ -25,6 +25,7 @@
 				<extensions>true</extensions>
 				<configuration>
                    	<deploymentType>cloudhub</deploymentType>
+                   	<muleVersion>API Gateway 2.2.0</muleVersion> 
        				<username>barbaraokupna</username>
         			<password>Athena2290*</password>
         			<environment>Development</environment>
