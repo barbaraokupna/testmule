@@ -28,8 +28,17 @@
        				<username>barbaraokupna</username>
         			<password>Athena2290*</password>
         			<environment>Development</environment>
-        			<redeploy>true</redeploy>
         			<applicationName>workergatewaymysqldev</applicationName>
+				<inclusions>
+                        <inclusion>
+                            <groupId>org.mule.modules</groupId>
+                            <artifactId>mule-module-apikit</artifactId>
+                        </inclusion>
+                    <inclusion>
+                            <groupId>org.mule.modules</groupId>
+                            <artifactId>mule-module-s3</artifactId>
+                        </inclusion>
+                    </inclusions>
                 </configuration>
                 <executions>
         			<execution>
@@ -38,6 +47,9 @@
         				<goals>
         					<goal>deploy</goal>
         				</goals>
+        				<configuration>
+        					<Application>workergatewaymysqldev</Application>
+        				</configuration>
         			</execution>
         		</executions>
 			</plugin>
