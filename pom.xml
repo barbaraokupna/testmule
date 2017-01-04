@@ -49,6 +49,7 @@
         					<goal>deploy</goal>
         				</goals>
         				<configuration>
+                            <domain>workergatewaymysqldev.cloudhub.io</domain>
         					<Application>workergatewaymysqldev</Application>
         				</configuration>
         			</execution>
